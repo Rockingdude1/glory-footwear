@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>GLORY FOOTWEAR — Live Catalog</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EEF0F3;
+    --panel:#FFFFFF;
+    --fill:#F3F4F6;
+    --ink:#1C1E21;
+    --ink-dim:#8A8F98;
+    --brass:#C9A227;
+    --brass-dark:#9C7E1E;
+    --green:#3F7D58;
+    --amber:#C97B2E;
+    --red:#A23B3B;
+    --line:rgba(20,20,20,0.08);
+    --card-line:rgba(20,20,20,0.08);
+    --radius:16px;
+    --font-display:'Oswald',sans-serif;
+    --font-body:'Inter',sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  #app{max-width:720px;margin:0 auto;padding-bottom:64px;}
+
+  /* Header panel — curved white rectangle sitting on the grey page background */
+  header.topbar{
+    position:sticky;top:0;z-index:30;
+    background:var(--panel);
+    border-radius:0 0 28px 28px;
+    box-shadow:0 4px 20px rgba(20,20,20,0.06);
+    padding:18px 16px 14px;
+  }
+  .logoplaceholder{display:flex;align-items:center;justify-content:center;gap:10px;padding:2px 0 10px;}
+  .logomark{
+    width:38px;height:38px;border-radius:50%;flex:0 0 auto;
+    background:linear-gradient(135deg,var(--brass),var(--brass-dark));
+    color:#fff;display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-display);font-weight:700;font-size:18px;
+  }
+  .logotext{font-family:var(--font-display);font-weight:700;letter-spacing:0.08em;font-size:15px;line-height:1.2;color:var(--ink);}
+  .logotext small{display:block;font-weight:600;letter-spacing:0.14em;color:var(--ink-dim);font-size:9.5px;}
+  .logoimg{max-height:42px;display:block;margin:0 auto 10px;}
+
+  .synced{
+    font-size:12px;color:var(--ink-dim);margin-top:2px;font-family:var(--font-mono);
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .refreshbtn{
+    background:none;border:1px solid var(--line);color:var(--brass-dark);font-family:var(--font-mono);
+    font-size:11.5px;padding:3px 9px;border-radius:999px;cursor:pointer;
+  }
+  .synced.warn{color:var(--amber);}
+
+  /* Search & filters */
+  .searchwrap{margin-top:10px;position:relative;}
+  .searchwrap input{
+    width:100%;padding:12px 38px 12px 14px;border-radius:12px;border:1px solid var(--line);
+    background:var(--fill);color:var(--ink);font-size:15px;font-family:var(--font-body);
+  }
+  .searchwrap input::placeholder{color:var(--ink-dim);}
+  .searchwrap input:focus{outline:none;border-color:var(--brass);box-shadow:0 0 0 3px rgba(201,162,39,0.15);}
+  .clearbtn{
+    position:absolute;right:8px;top:50%;transform:translateY(-50%);
+    background:none;border:none;color:var(--ink-dim);font-size:18px;cursor:pointer;padding:4px 8px;
+  }
+  .chiprow{display:flex;gap:8px;overflow-x:auto;margin-top:10px;padding-bottom:2px;}
+  .chiprow::-webkit-scrollbar{display:none;}
+  .chip{
+    flex:0 0 auto;font-family:var(--font-display);font-size:12px;letter-spacing:0.03em;text-transform:uppercase;
+    padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);
+    color:var(--ink);cursor:pointer;white-space:nowrap;
+  }
+  .chip.active{background:#15161A;color:#fff;border-color:#15161A;font-weight:600;}
+
+  /* Product grid */
+  .grid{padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .pcard{
+    background:var(--panel);border-radius:18px;padding:10px;cursor:pointer;
+    box-shadow:0 2px 10px rgba(20,20,20,0.05);display:flex;flex-direction:column;
+  }
+  .pimg{position:relative;width:100%;aspect-ratio:1/1;border-radius:14px;overflow:hidden;background:#F1F0EC;margin-bottom:10px;}
+  .pimg img{width:100%;height:100%;object-fit:cover;display:block;}
+  .statusdotcorner{
+    position:absolute;top:8px;right:8px;width:11px;height:11px;border-radius:50%;
+    border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,0.25);
+  }
+  .statusdotcorner.in{background:var(--green);}
+  .statusdotcorner.low{background:var(--amber);}
+  .statusdotcorner.out{background:var(--red);}
+
+  .swatch{
+    display:inline-block;border-radius:50%;border:1px solid rgba(0,0,0,0.15);
+    cursor:pointer;flex:0 0 auto;position:relative;
+  }
+  .swatch-sm{width:15px;height:15px;}
+  .swatch-sm.active{border:2px solid #15161A;}
+  .swatch-lg{width:32px;height:32px;}
+  .swatch-lg.active{border:2px solid #15161A;box-shadow:0 0 0 2px #fff inset;}
+  .swatch-lg .statusdot{
+    position:absolute;bottom:-2px;right:-2px;width:11px;height:11px;border-radius:50%;border:2px solid var(--panel);
+  }
+  .swatch-lg .statusdot.in{background:var(--green);}
+  .swatch-lg .statusdot.low{background:var(--amber);}
+  .swatch-lg .statusdot.out{background:var(--red);}
+
+  .pswatches{display:flex;justify-content:center;gap:6px;margin-bottom:8px;}
+  .pname{font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--ink);margin:0;line-height:1.25;}
+  .pcat{font-size:11.5px;color:var(--ink-dim);margin:2px 0 8px;}
+  .pprice{font-weight:700;font-size:14px;color:var(--ink);margin-top:auto;}
+
+  .emptystate{padding:60px 24px;text-align:center;color:var(--ink-dim);}
+  .emptystate .big{font-family:var(--font-display);font-size:18px;color:var(--ink);margin-bottom:8px;}
+
+  /* Buttons */
+  .btn{
+    font-family:var(--font-display);font-size:13px;letter-spacing:0.03em;text-transform:uppercase;
+    padding:10px 16px;border-radius:8px;border:1px solid var(--brass);background:var(--brass);
+    color:#1F2421;font-weight:600;cursor:pointer;
+  }
+  .btn.ghost{background:transparent;color:var(--brass-dark);}
+
+  /* Detail overlay */
+  .overlay{
+    position:fixed;inset:0;background:rgba(15,17,15,0.55);z-index:50;display:flex;
+    align-items:flex-end;justify-content:center;
+  }
+  .sheet{
+    background:var(--panel);color:var(--ink);width:100%;max-width:720px;border-radius:18px 18px 0 0;
+    padding:18px 18px 28px;max-height:88vh;overflow-y:auto;
+  }
+  .sheet .closebar{display:flex;justify-content:flex-end;margin-bottom:6px;}
+  .sheet .closebar button{background:none;border:none;font-size:22px;color:var(--ink-dim);cursor:pointer;}
+  .sheet .bigthumb{width:100%;margin-bottom:14px;}
+  .sheet .bigthumb img{
+    width:100%;height:auto;display:block;
+    border-radius:12px;border:1px solid var(--card-line);cursor:zoom-in;
+  }
+
+  /* Full-size image viewer: pinch-to-zoom + drag-to-pan by touch */
+  .imgviewer{
+    position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:80;
+    display:flex;align-items:center;justify-content:center;overflow:hidden;
+    touch-action:none;
+  }
+  .imgviewer img{
+    max-width:100%;max-height:100%;touch-action:none;
+    user-select:none;-webkit-user-select:none;-webkit-user-drag:none;
+  }
+  .imgviewer .closebar{position:absolute;top:14px;right:14px;z-index:81;}
+  .imgviewer .closebar button{
+    background:rgba(255,255,255,0.14);border:none;color:#fff;font-size:22px;
+    width:40px;height:40px;border-radius:50%;cursor:pointer;
+  }
+  .sheet h2{font-family:var(--font-display);font-size:21px;margin:0 0 6px;}
+  .sheet .row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--card-line);font-size:14px;}
+  .sheet .row:last-of-type{border-bottom:none;}
+  .sheet .row span:first-child{color:var(--ink-dim);}
+  .sheet .row span:last-child{font-weight:600;}
+  .sheet .actions{display:flex;gap:10px;margin-top:16px;}
+
+  /* Toast */
+  .toast{
+    position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+    background:var(--brass);color:#1F2421;font-family:var(--font-display);font-size:13px;font-weight:600;
+    padding:10px 18px;border-radius:999px;z-index:60;box-shadow:0 6px 18px rgba(0,0,0,0.35);
+  }
+
+  .skel{padding:60px 0;text-align:center;color:var(--ink-dim);font-family:var(--font-mono);font-size:13px;}
+
+  .sectionlabel{
+    font-family:var(--font-display);font-size:12px;letter-spacing:0.05em;text-transform:uppercase;
+    color:var(--ink-dim);margin:16px 0 8px;
+  }
+  .colorswatches{display:flex;gap:12px;flex-wrap:wrap;}
+  .sizetable .sizerow{
+    display:flex;justify-content:space-between;align-items:center;padding:9px 0;
+    border-bottom:1px solid var(--card-line);font-size:14px;
+  }
+  .sizetable .sizerow:last-child{border-bottom:none;}
+  .sizetable .sizeval{font-family:var(--font-mono);font-weight:700;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ==========================================
+// CONFIGURATION
+// ==========================================
+// This is your live Google Sheets CSV feed:
+const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQdxJyL16-UyMxRy7VkaFwAAFD0YAGnPcR7I522aIzjl4SP8-T75IuSCUNj0VSJqyYvJYBvnwNcHAN4/pub?gid=0&single=true&output=csv";
+
+// Set the stock number that triggers the "Low Stock" amber badge
+const LOW_STOCK_THRESHOLD = 5;
+
+// Paste a hosted image URL for your logo here once you have one (e.g. a Drive
+// share link like the product photos, or any direct image URL). Leave blank to
+// show a placeholder wordmark in its place.
+const BRAND_LOGO_URL = "";
+// ==========================================
+
+const DEMO_ITEMS = [];
+
+const state = {
+  items: [],
+  products: [],
+  lastSynced: null,
+  loading: true,
+  isDemo: false,
+  search: '',
+  category: 'All',
+  selectedCode: null,
+  selectedColor: null,
+  cardPreview: {},
+  toast: null
+};
+
+function esc(str){
+  return String(str === undefined || str === null ? '' : str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function titleCase(str){
+  return String(str||'').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+const PLACEHOLDER_SVG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#EDE6D6"/><path d="M18 64 C18 50 30 46 42 45 L60 43 C70 42 76 47 80 54 L84 60 C86 63 86 67 84 70 L82 73 L18 73 Z" fill="none" stroke="#B9A98A" stroke-width="3" stroke-linejoin="round"/><line x1="30" y1="73" x2="30" y2="78" stroke="#B9A98A" stroke-width="3"/><line x1="74" y1="73" x2="74" y2="78" stroke="#B9A98A" stroke-width="3"/></svg>'
+);
+
+// Converts a Google Drive "view"/"open" share link into a directly-loadable
+// thumbnail image URL. Any other URL (a non-Drive host, or an already-converted
+// thumbnail link) passes through unchanged.
+function toImageSrc(url){
+  if(!url) return null;
+  const m = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)/);
+  if(m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w400';
+  return url;
+}
+
+// Rough color-name-to-swatch mapping for the abbreviated color codes used in
+// the sheet (BLK, BRN, P.BLUE, etc). Falls back to a neutral grey for anything
+// unrecognized — the swatch's title tooltip still shows the real color name.
+const COLOR_HEX_RULES = [
+  [/black|\bblk\b/, '#1c1c1c'],
+  [/navy/, '#22304f'],
+  [/\bbrn\b|brown/, '#8b5a2b'],
+  [/grey|gray|\bgry\b/, '#9a9a9a'],
+  [/white|\bwht\b/, '#f2f2f2'],
+  [/pink/, '#e8a0bf'],
+  [/red|cherry|maroon/, '#b5342f'],
+  [/tan|beige/, '#d8c3a0'],
+  [/green|olive/, '#5c7a4f'],
+  [/orange/, '#d2691e'],
+  [/yellow/, '#e3c34a'],
+  [/blue/, '#3b6bc7'],
+];
+function colorToHex(raw){
+  const key = String(raw||'').toLowerCase();
+  for(const [re, hex] of COLOR_HEX_RULES){ if(re.test(key)) return hex; }
+  return '#b9b2a2';
+}
+
+function timeAgo(iso){
+  if(!iso) return null;
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs/60000);
+  if(mins < 1) return 'just now';
+  if(mins < 60) return mins + ' min ago';
+  const hrs = Math.floor(mins/60);
+  if(hrs < 24) return hrs + ' hr' + (hrs>1?'s':'') + ' ago';
+  const days = Math.floor(hrs/24);
+  return days + ' day' + (days>1?'s':'') + ' ago';
+}
+
+function splitCSVLine(line){
+  const out=[]; let cur=''; let inQuotes=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(inQuotes){
+      if(c==='"'){
+        if(line[i+1]==='"'){ cur+='"'; i++; } else { inQuotes=false; }
+      } else cur+=c;
+    } else {
+      if(c==='"') inQuotes=true;
+      else if(c===','){ out.push(cur); cur=''; }
+      else cur+=c;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
+// Parses the sheet into a flat list of SKU+color+size variant rows.
+//
+// The live sheet mirrors how the team actually fills it in, not a strict
+// one-column-per-field table:
+//  - The SKU ("Item Details") is only typed on the first row of each product;
+//    the rows below it (same product, different color/size) leave it blank,
+//    relying on the visual grouping in the spreadsheet. We carry the last SKU
+//    forward onto blank rows.
+//  - Category isn't a column — it's a standalone row (e.g. "HOLIDAY") with
+//    every other cell blank, acting as a section header for every row beneath
+//    it until the next one. A row counts as a category header when it has no
+//    color and no size, since every real product row always has both.
+//  - There can be several "Image URL" columns (alternate photos); we use the
+//    first one that isn't empty.
+// An explicit CATEGORY column, when present, always wins over the section-
+// header inference above — this keeps a simpler flat CSV (e.g. for local
+// testing) working unchanged.
+function parseCSV(text){
+  text = text.replace(/^﻿/, '');
+  const lines = text.replace(/\r/g,'').split('\n').filter(l => l.trim().length>0);
+  if(lines.length < 2) throw new Error('Data needs a header row plus at least one product row.');
+
+  // The sheet can have a category-section row (e.g. "Fabrication") sitting
+  // above the real column-header row, so we search for the header instead of
+  // assuming it's line 1 — it's whichever of the first few lines has a STOCK
+  // column.
+  let headerRowIdx = 0;
+  for(let i=0;i<Math.min(lines.length, 5);i++){
+    const probe = splitCSVLine(lines[i]).map(h=>h.trim().toLowerCase().replace(/\s+/g, ''));
+    if(probe.includes('stock')){ headerRowIdx = i; break; }
+  }
+
+  const headers = splitCSVLine(lines[headerRowIdx]).map(h=>h.trim().toLowerCase().replace(/\s+/g, ''));
+  const idx = {};
+  headers.forEach((h,i)=>{ if(idx[h]===undefined) idx[h]=i; });
+
+  const skuIdx = [idx.sku, idx.itemdetails, idx.code, idx.name].find(v=>v!==undefined);
+  const colorIdx = idx.color !== undefined ? idx.color : idx['p1(color)'];
+  const sizeIdx = idx.size !== undefined ? idx.size : idx['p2(size)'];
+  const categoryIdx = idx.category;
+  const priceIdx = idx.mrp !== undefined ? idx.mrp : idx.price;
+  const stockIdx = idx.stock;
+  const imageIdxs = headers.map((h,i)=>h.indexOf('imageurl')===0 ? i : -1).filter(i=>i>=0);
+
+  if(skuIdx===undefined || stockIdx===undefined){
+    throw new Error('Could not find a product-identifier column ("Item Details"/"SKU"/"NAME") and a "STOCK" column.');
+  }
+
+  const items = [];
+  let lastSku = null;
+  let currentCategory = '';
+
+  // Any line(s) before the header row are themselves a leading category label.
+  for(let i=0;i<headerRowIdx;i++){
+    const first = splitCSVLine(lines[i])[0];
+    if(first && first.trim()) currentCategory = first.trim();
+  }
+
+  for(let i=headerRowIdx+1;i<lines.length;i++){
+    const cols = splitCSVLine(lines[i]);
+    if(cols.every(c=>c.trim()==='')) continue;
+
+    const skuCell = (cols[skuIdx]||'').trim();
+    const color = colorIdx!==undefined ? (cols[colorIdx]||'').trim() : '';
+    const size = sizeIdx!==undefined ? (cols[sizeIdx]||'').trim() : '';
+
+    if(skuCell) lastSku = skuCell;
+
+    // A row with no color and no size is a category-section header, not a product row.
+    if(!color && !size){
+      if(skuCell) currentCategory = skuCell;
+      continue;
+    }
+
+    const sku = lastSku || skuCell;
+    if(!sku) continue;
+
+    let imageUrl = '';
+    for(const ci of imageIdxs){
+      const v = (cols[ci]||'').trim();
+      if(v){ imageUrl = v; break; }
+    }
+
+    const cellCategory = categoryIdx!==undefined ? (cols[categoryIdx]||'').trim() : '';
+
+    items.push({
+      sku: sku,
+      category: cellCategory || currentCategory,
+      color: color,
+      size: size,
+      stock: parseInt(cols[stockIdx], 10) || 0,
+      price: priceIdx!==undefined && cols[priceIdx] ? (parseFloat(cols[priceIdx]) || null) : null,
+      imageUrl: imageUrl
+    });
+  }
+  return items;
+}
+
+function stockStatus(stock){
+  if(stock <= 0) return 'out';
+  if(stock <= LOW_STOCK_THRESHOLD) return 'low';
+  return 'in';
+}
+
+function stockStamp(stock){
+  const status = stockStatus(stock);
+  if(status==='out') return '<span class="stamp out">Out of stock</span>';
+  if(status==='low') return '<span class="stamp low">Low &middot; ' + stock + '</span>';
+  return '<span class="stamp in">In stock &middot; ' + stock + '</span>';
+}
+
+// Groups flat SKU+color+size rows into one product per SKU, with colors nested
+// inside and sizes nested inside each color. This is the shape the whole UI
+// (product cards + the color/size detail table) is built around.
+function buildProducts(items){
+  const bySku = new Map();
+
+  items.forEach(it => {
+    if(!bySku.has(it.sku)){
+      bySku.set(it.sku, { sku: it.sku, category: it.category, price: it.price, colors: new Map(), totalStock: 0 });
+    }
+    const product = bySku.get(it.sku);
+    if(!product.category && it.category) product.category = it.category;
+    if(product.price==null && it.price!=null) product.price = it.price;
+
+    const colorKey = it.color || 'Standard';
+    if(!product.colors.has(colorKey)){
+      product.colors.set(colorKey, { color: colorKey, imageUrl: '', stock: 0, sizes: [] });
+    }
+    const colorEntry = product.colors.get(colorKey);
+    if(!colorEntry.imageUrl && it.imageUrl) colorEntry.imageUrl = it.imageUrl;
+    colorEntry.sizes.push({ size: it.size, stock: it.stock });
+    colorEntry.stock += it.stock;
+    product.totalStock += it.stock;
+  });
+
+  return Array.from(bySku.values()).map(p => {
+    const colors = Array.from(p.colors.values());
+    const searchParts = [p.sku, p.category].concat(
+      colors.flatMap(c => [c.color].concat(c.sizes.map(s=>s.size)))
+    );
+    return { ...p, colors: colors, searchText: searchParts.join(' ').toLowerCase() };
+  });
+}
+
+let isFirstLoad = true;
+
+async function loadCatalog(){
+  if(isFirstLoad){ state.loading = true; render(); }
+  try{
+    if(!GOOGLE_SHEET_CSV_URL || GOOGLE_SHEET_CSV_URL === "YOUR_GOOGLE_SHEET_CSV_URL_HERE"){
+      throw new Error("No URL provided");
+    }
+
+    const res = await fetch(GOOGLE_SHEET_CSV_URL, { cache: 'no-store' });
+    if(!res.ok) throw new Error('HTTP Error: ' + res.status);
+
+    const text = await res.text();
+
+    if(text.trim().toLowerCase().startsWith('<!doctype html>') || text.trim().toLowerCase().startsWith('<html')){
+       throw new Error('Google is blocking access (Requires Login)');
+    }
+
+    state.items = parseCSV(text);
+    state.products = buildProducts(state.items);
+    state.isDemo = false;
+    state.lastSynced = new Date().toISOString();
+
+  } catch(e){
+    console.error("Failed to load catalog data:", e);
+    state.items = DEMO_ITEMS;
+    state.products = buildProducts(DEMO_ITEMS);
+    state.isDemo = true;
+    state.lastSynced = null;
+    showToast('Failed to sync. Error: ' + e.message);
+  }
+  state.loading = false;
+  isFirstLoad = false;
+  render();
+}
+
+function showToast(msg){
+  state.toast = msg;
+  render();
+  setTimeout(()=>{ state.toast = null; render(); }, 3500);
+}
+
+/* ---------- Event handlers ---------- */
+
+function setSearch(val){ state.search = val; render(); }
+function clearSearch(){ state.search=''; render(); }
+function setCategory(c){ state.category = c; render(); }
+
+function openDetail(sku){
+  state.selectedCode = sku;
+  const product = state.products.find(p => p.sku === sku);
+  state.selectedColor = product && product.colors.length ? product.colors[0].color : null;
+  render();
+}
+function closeDetail(){ state.selectedCode = null; state.selectedColor = null; render(); }
+function selectColor(color){ state.selectedColor = color; render(); }
+
+// Which color a grid card is currently previewing — independent of the detail
+// drawer's own color selection. event.stopPropagation() keeps the click from
+// also opening the product's detail drawer (the card itself is clickable too).
+function previewCardColor(sku, color, event){
+  if(event) event.stopPropagation();
+  state.cardPreview[sku] = color;
+  render();
+}
+
+function copyCode(code){
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(code).then(()=>showToast('SKU copied: ' + code));
+  }
+}
+
+/* ---------- Rendering ---------- */
+
+function getFilteredProducts(){
+  let list = state.products;
+  if(state.category !== 'All'){
+    list = list.filter(p => (p.category||'Uncategorized').toLowerCase() === state.category.toLowerCase());
+  }
+  if(state.search.trim()){
+    const q = state.search.trim().toLowerCase();
+    list = list.filter(p => p.searchText.includes(q));
+  }
+  return list;
+}
+
+function getCategories(){
+  const set = new Set();
+  state.products.forEach(p => { if(p.category) set.add(p.category); });
+  return ['All'].concat(Array.from(set).sort());
+}
+
+function swatchHtml(color, hex, isActive, sizeClass, onclickJs, showStatusDot, status){
+  const statusDot = showStatusDot ? '<span class="statusdot ' + status + '"></span>' : '';
+  return (
+    '<span class="swatch ' + sizeClass + (isActive?' active':'') + '" style="background:' + hex + '" ' +
+      'title="' + esc(titleCase(color)) + '" onclick="' + onclickJs + '">' + statusDot + '</span>'
+  );
+}
+
+function renderCard(p){
+  const previewColorKey = state.cardPreview[p.sku] || p.colors[0].color;
+  const previewEntry = p.colors.find(c => c.color === previewColorKey) || p.colors[0];
+  const img = previewEntry.imageUrl ? esc(toImageSrc(previewEntry.imageUrl)) : PLACEHOLDER_SVG;
+  const status = stockStatus(p.totalStock);
+  const skuJs = esc(p.sku).replace(/'/g,"\\'");
+
+  const swatches = p.colors.map(c => {
+    const active = c.color === previewEntry.color;
+    const onclickJs = 'previewCardColor(\'' + skuJs + '\',\'' + c.color.replace(/'/g,"\\'") + '\',event)';
+    return swatchHtml(c.color, colorToHex(c.color), active, 'swatch-sm', onclickJs, false);
+  }).join('');
+
+  return (
+    '<div class="pcard" onclick="openDetail(\'' + skuJs + '\')">' +
+      '<div class="pimg">' +
+        '<img src="' + img + '" loading="lazy" decoding="async" onerror="this.src=\'' + PLACEHOLDER_SVG + '\'" alt="">' +
+        '<span class="statusdotcorner ' + status + '"></span>' +
+      '</div>' +
+      (p.colors.length > 1 ? '<div class="pswatches">' + swatches + '</div>' : '') +
+      '<p class="pname">' + esc(p.sku) + '</p>' +
+      '<p class="pcat">' + esc(titleCase(p.category) || 'Uncategorized') + '</p>' +
+      (p.price ? '<p class="pprice">₹' + esc(p.price) + '</p>' : '') +
+    '</div>'
+  );
+}
+
+function renderAgentView(){
+  const cats = getCategories();
+  const filtered = getFilteredProducts();
+  let synced = '';
+  if(state.isDemo){
+    synced = '<div class="synced warn">Showing sample data — connect your Google Sheet</div>';
+  } else if(state.lastSynced){
+    synced = '<div class="synced">Synced ' + timeAgo(state.lastSynced) + ' &nbsp;<button class="refreshbtn" onclick="loadCatalog()">&#8635; Refresh</button></div>';
+  } else {
+    synced = '<div class="synced"><button class="refreshbtn" onclick="loadCatalog()">&#8635; Refresh</button></div>';
+  }
+
+  const logoHtml = BRAND_LOGO_URL
+    ? '<img class="logoimg" src="' + esc(BRAND_LOGO_URL) + '" alt="Brand logo">'
+    : '<div class="logoplaceholder"><span class="logomark">G</span><span class="logotext">GLORY FOOTWEAR<small>LIVE CATALOG</small></span></div>';
+
+  let listHtml;
+  if(state.loading){
+    listHtml = '<div class="skel">Loading live catalog…</div>';
+  } else if(filtered.length === 0){
+    listHtml = '<div class="emptystate"><div class="big">No matches</div>Try a different name, size, or category.</div>';
+  } else {
+    listHtml = '<div class="grid">' + filtered.map(renderCard).join('') + '</div>';
+  }
+
+  return (
+    '<header class="topbar">' +
+      logoHtml +
+      synced +
+      '<div class="searchwrap">' +
+        '<input type="text" placeholder="Search by SKU, category, color or size…" value="' + esc(state.search) + '" oninput="setSearch(this.value)">' +
+        (state.search ? '<button class="clearbtn" onclick="clearSearch()">&times;</button>' : '') +
+      '</div>' +
+      '<div class="chiprow">' + cats.map(c =>
+        '<div class="chip ' + (c===state.category?'active':'') + '" onclick="setCategory(\'' + c.replace(/'/g,"\\'") + '\')">' + esc(titleCase(c)) + '</div>'
+      ).join('') + '</div>' +
+    '</header>' +
+    listHtml +
+    renderDetailOverlay()
+  );
+}
+
+function renderDetailOverlay(){
+  if(!state.selectedCode) return '';
+  const p = state.products.find(x => x.sku === state.selectedCode);
+  if(!p) return '';
+
+  const selectedColorEntry = p.colors.find(c => c.color === state.selectedColor) || p.colors[0];
+  const img = selectedColorEntry && selectedColorEntry.imageUrl ? esc(toImageSrc(selectedColorEntry.imageUrl)) : PLACEHOLDER_SVG;
+
+  const colorSwatches = p.colors.map(c => {
+    const status = stockStatus(c.stock);
+    const active = c.color === selectedColorEntry.color;
+    const onclickJs = 'selectColor(\'' + c.color.replace(/'/g,"\\'") + '\')';
+    return swatchHtml(c.color, colorToHex(c.color), active, 'swatch-lg', onclickJs, true, status);
+  }).join('');
+
+  const sizeRows = selectedColorEntry ? selectedColorEntry.sizes.map(s =>
+    '<div class="sizerow"><span class="sizeval">' + esc(s.size || '—') + '</span>' + stockStamp(s.stock) + '</div>'
+  ).join('') : '';
+
+  return (
+    '<div class="overlay" onclick="if(event.target===this) closeDetail()">' +
+      '<div class="sheet">' +
+        '<div class="closebar"><button onclick="closeDetail()">&times;</button></div>' +
+        '<div class="bigthumb"><img src="' + img + '" onerror="this.src=\'' + PLACEHOLDER_SVG + '\'" onclick="openImageViewer(this.src)" alt=""></div>' +
+        '<h2>' + esc(p.sku) + '</h2>' +
+        '<div class="row"><span>Category</span><span>' + esc(titleCase(p.category)||'—') + '</span></div>' +
+        (p.price ? '<div class="row"><span>Price</span><span>₹' + esc(p.price) + '</span></div>' : '') +
+        '<div class="sectionlabel">Color</div>' +
+        '<div class="colorswatches">' + colorSwatches + '</div>' +
+        '<div class="sectionlabel">Sizes &amp; stock &middot; ' + esc(titleCase(selectedColorEntry.color)) + '</div>' +
+        '<div class="sizetable">' + sizeRows + '</div>' +
+        '<div class="actions">' +
+          '<button class="btn" onclick="copyCode(\'' + esc(p.sku).replace(/'/g,"\\'") + '\')">Copy SKU</button>' +
+          '<button class="btn ghost" onclick="closeDetail()">Close</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>'
+  );
+}
+
+function render(){
+  const app = document.getElementById('app');
+  const scrollY = window.scrollY;
+  let html = renderAgentView();
+  if(state.toast){
+    html += '<div class="toast">' + esc(state.toast) + '</div>';
+  }
+  app.innerHTML = html;
+  window.scrollTo(0, scrollY);
+}
+
+/* ---------- Full-size image viewer (tap to open, pinch/drag to zoom) ---------- */
+// Kept outside the state/render() cycle deliberately: touchmove fires far too
+// often for a full HTML-string rebuild on every event, so this manipulates its
+// own overlay element directly.
+
+let imgViewerEl = null;
+
+function openImageViewer(src){
+  if(!src) return;
+  closeImageViewer();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'imgviewer';
+  overlay.innerHTML =
+    '<div class="closebar"><button aria-label="Close">&times;</button></div>' +
+    '<img src="' + src + '" alt="">';
+  document.body.appendChild(overlay);
+  imgViewerEl = overlay;
+
+  const img = overlay.querySelector('img');
+  let scale = 1, originX = 0, originY = 0;
+  let startDist = 0, startScale = 1;
+  let startX = 0, startY = 0, startOriginX = 0, startOriginY = 0;
+  let isPanning = false;
+
+  function applyTransform(){
+    img.style.transform = 'translate(' + originX + 'px,' + originY + 'px) scale(' + scale + ')';
+  }
+  function touchDist(touches){
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+
+  overlay.addEventListener('touchstart', function(e){
+    if(e.touches.length === 2){
+      startDist = touchDist(e.touches);
+      startScale = scale;
+    } else if(e.touches.length === 1){
+      isPanning = true;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      startOriginX = originX;
+      startOriginY = originY;
+    }
+  }, {passive:true});
+
+  overlay.addEventListener('touchmove', function(e){
+    e.preventDefault();
+    if(e.touches.length === 2){
+      const newDist = touchDist(e.touches);
+      scale = Math.min(Math.max(startScale * (newDist / startDist), 1), 5);
+      applyTransform();
+    } else if(e.touches.length === 1 && isPanning && scale > 1){
+      originX = startOriginX + (e.touches[0].clientX - startX);
+      originY = startOriginY + (e.touches[0].clientY - startY);
+      applyTransform();
+    }
+  }, {passive:false});
+
+  overlay.addEventListener('touchend', function(e){
+    if(e.touches.length === 0){
+      isPanning = false;
+      if(scale <= 1){ scale = 1; originX = 0; originY = 0; applyTransform(); }
+    }
+  });
+
+  overlay.addEventListener('click', function(e){
+    if(e.target === overlay) closeImageViewer();
+  });
+  overlay.querySelector('.closebar button').addEventListener('click', closeImageViewer);
+}
+
+function closeImageViewer(){
+  if(imgViewerEl){
+    imgViewerEl.remove();
+    imgViewerEl = null;
+  }
+}
+
+// Initial load
+loadCatalog();
+
+// Stock only changes once a day, so there's no need to hammer the sheet — this
+// just catches the case where someone leaves the tab open across the daily update.
+setInterval(function(){
+  if(!state.selectedCode){
+    loadCatalog();
+  }
+}, 30 * 60 * 1000);
+</script>
+</body>
+</html>
