@@ -65,9 +65,8 @@
     display:flex;align-items:center;justify-content:flex-end;
   }
   .refreshbtn{
-    background:var(--fill);border:1px solid var(--line);color:var(--primary-dark);
-    font-size:16px;line-height:1;width:32px;height:32px;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    background:var(--fill);border:1px solid var(--line);color:var(--primary-dark);font-family:var(--font-mono);
+    font-size:11.5px;padding:3px 10px;border-radius:999px;cursor:pointer;
   }
   .synced.warn{color:var(--amber);}
 
@@ -634,7 +633,7 @@ function renderHeaderHtml(){
   if(state.isDemo){
     synced = '<div class="synced warn">Showing sample data — connect your Google Sheet</div>';
   } else {
-    synced = '<div class="synced"><button class="refreshbtn" onclick="loadCatalog()" aria-label="Refresh">&#8635;</button></div>';
+    synced = '<div class="synced"><button class="refreshbtn" onclick="loadCatalog()">&#8635; Refresh</button></div>';
   }
 
   const logoHtml = BRAND_LOGO_URL
