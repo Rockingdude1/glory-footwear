@@ -127,6 +127,22 @@
   .swatch-lg .statusdot.in{background:var(--green);}
   .swatch-lg .statusdot.low{background:var(--amber);}
   .swatch-lg .statusdot.out{background:var(--red);}
+  /* The "MIX" slot's badge swatch — replaces a plain color circle wherever
+     that slot appears, since it has no single real color. */
+  .swatch.mixbadge{padding:0;overflow:hidden;}
+  .swatch.mixbadge svg{display:block;width:100%;height:100%;}
+
+  /* MIX slot: swipeable photo gallery instead of a single bigthumb */
+  .mixcarousel{
+    display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
+    border-radius:12px;margin-bottom:10px;
+  }
+  .mixcarousel::-webkit-scrollbar{display:none;}
+  .mixslide{flex:0 0 100%;scroll-snap-align:center;}
+  .mixslide img{width:100%;height:auto;display:block;border-radius:12px;}
+  .mixdots{display:flex;justify-content:center;gap:6px;margin-bottom:14px;}
+  .mixdots .dot{width:6px;height:6px;border-radius:50%;background:var(--line);}
+  .mixdots .dot.active{background:var(--primary);}
 
   .pswatches{display:flex;justify-content:center;gap:6px;margin-bottom:8px;}
   .pname{font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--ink);margin:0;line-height:1.25;}
@@ -410,32 +426,20 @@ function parseCSV(text){
     const rowStock = parseInt(cols[stockIdx], 10) || 0;
     const rowPrice = priceIdx!==undefined && cols[priceIdx] ? (parseFloat(cols[priceIdx]) || null) : null;
 
-    // "MIX" means no single color was recorded for this row — instead, each
-    // populated Image URL column is actually a distinct color option (e.g.
-    // OWOW-01's one 5x8 row has an Image URL(1) and Image URL(2), one photo
-    // per real color bundled under the "MIX" label). Split those into
-    // separate selectable colors instead of only ever showing the first photo
-    // and silently dropping the rest. The row's stock is shared across them
-    // (split as evenly as possible) since the sheet only gives one combined
-    // number for the whole row — showing the full count under each would
-    // double-count the product's total stock.
-    if(color.trim().toUpperCase() === 'MIX'){
+    // Any row whose color mentions "mix" (e.g. "MIX", "MIX P-1") means no
+    // single real color was recorded — it's a general assortment, and the
+    // populated Image URL columns are just photos of what's in it, not one
+    // photo per real color. These all collapse into a single "MIX" color
+    // slot per product (see buildProducts), with the row's full stock kept
+    // intact (no artificial splitting) and every photo folded into a shared
+    // gallery for that slot.
+    if(color.toLowerCase().includes('mix')){
       const urls = imageIdxs.map(ci => (cols[ci]||'').trim()).filter(Boolean);
-      if(urls.length === 0){
-        items.push({ sku, category: rowCategory, color, size, stock: rowStock, price: rowPrice, imageUrl: '' });
-      } else {
-        const base = Math.floor(rowStock / urls.length);
-        let remainder = rowStock - base * urls.length;
-        urls.forEach((u, i) => {
-          const share = base + (remainder > 0 ? 1 : 0);
-          if(remainder > 0) remainder--;
-          items.push({
-            sku, category: rowCategory,
-            color: extractColorFromFilename(u, 'Color ' + (i + 1)),
-            size, stock: share, price: rowPrice, imageUrl: u
-          });
-        });
-      }
+      items.push({
+        sku, category: rowCategory, color: 'MIX', size,
+        stock: rowStock, price: rowPrice,
+        imageUrl: urls[0] || '', imageUrls: urls
+      });
       continue;
     }
 
@@ -456,17 +460,6 @@ function parseCSV(text){
     });
   }
   return items;
-}
-
-// Pulls a color name out of a filename shaped like "{SKU}_{Color}_Main.jpg"
-// (the convention used throughout this sheet). Falls back to a generic label
-// if the URL is already a converted Drive link (which has no filename info)
-// or doesn't match the pattern.
-function extractColorFromFilename(url, fallback){
-  if(!url) return fallback;
-  const tail = url.split('/').pop().split('?')[0];
-  const m = tail.match(/_([A-Za-z.]+?)_Main/i);
-  return (m && m[1]) ? m[1] : fallback;
 }
 
 function stockStatus(stock){
@@ -496,19 +489,29 @@ function buildProducts(items){
     if(!product.category && it.category) product.category = it.category;
     if(product.price==null && it.price!=null) product.price = it.price;
 
+    // Every row whose color contains "mix" was normalized to the literal
+    // color 'MIX' in parseCSV, so they all land in the same colorKey here —
+    // this is what collapses OWOW-01's 3 size-rows (or RINA's stray "MIX"
+    // row alongside its real RED/S.GRN colors) into exactly one MIX slot per
+    // product, instead of one slot per row.
     const colorKey = it.color || 'Standard';
     if(!product.colors.has(colorKey)){
-      product.colors.set(colorKey, { color: colorKey, imageUrl: '', stock: 0, sizes: [] });
+      product.colors.set(colorKey, { color: colorKey, imageUrl: '', photoSet: new Set(), stock: 0, sizes: [] });
     }
     const colorEntry = product.colors.get(colorKey);
     if(!colorEntry.imageUrl && it.imageUrl) colorEntry.imageUrl = it.imageUrl;
+    (it.imageUrls && it.imageUrls.length ? it.imageUrls : (it.imageUrl ? [it.imageUrl] : []))
+      .forEach(u => colorEntry.photoSet.add(u));
     colorEntry.sizes.push({ size: it.size, stock: it.stock });
     colorEntry.stock += it.stock;
     product.totalStock += it.stock;
   });
 
   return Array.from(bySku.values()).map(p => {
-    const colors = Array.from(p.colors.values());
+    const colors = Array.from(p.colors.values()).map(c => {
+      const { photoSet, ...rest } = c;
+      return { ...rest, photos: Array.from(photoSet) };
+    });
     const searchParts = [p.sku, p.category].concat(
       colors.flatMap(c => [c.color].concat(c.sizes.map(s=>s.size)))
     );
@@ -566,11 +569,14 @@ function showToast(msg){
 let searchDebounceTimer = null;
 function setSearch(val){
   state.search = val;
+  // Deliberately not calling renderHeader() here: rebuilding the header would
+  // recreate the <input> element itself and steal focus after every single
+  // keystroke, forcing you to click back into the box to type the next
+  // character. Toggle the clear ("x") button directly instead.
+  const clearBtn = document.getElementById('clearBtn');
+  if(clearBtn) clearBtn.style.display = val ? '' : 'none';
   clearTimeout(searchDebounceTimer);
   searchDebounceTimer = setTimeout(renderGrid, 150);
-  // The clear ("x") button's visibility depends on state.search, so the header
-  // needs a render too — but that's cheap (a handful of elements), unlike the grid.
-  renderHeader();
 }
 function clearSearch(){ state.search=''; renderHeader(); renderGrid(); }
 function setCategory(c){ state.category = c; renderHeader(); renderGrid(); }
@@ -644,17 +650,35 @@ function imgTag(rawUrl, width, cssClass, extraAttrs){
   );
 }
 
+// Small four-color pinwheel used as a single "multiple colors available"
+// badge for the "MIX" color slot, used in place of a plain color circle
+// wherever that slot appears — it has no single real color, just a shared
+// photo gallery, so a plain swatch would be meaningless.
+const MIX_ICON_SVG =
+  '<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">' +
+    '<path d="M16 16 L16 2 A14 14 0 0 1 30 16 Z" fill="#7F2726"/>' +
+    '<path d="M16 16 L30 16 A14 14 0 0 1 16 30 Z" fill="#CF987E"/>' +
+    '<path d="M16 16 L16 30 A14 14 0 0 1 2 16 Z" fill="#3A3226"/>' +
+    '<path d="M16 16 L2 16 A14 14 0 0 1 16 2 Z" fill="#9A9A9A"/>' +
+    '<circle cx="16" cy="16" r="14.5" fill="none" stroke="rgba(0,0,0,0.15)"/>' +
+  '</svg>';
+
 function renderCard(p){
+  const skuJs = esc(p.sku).replace(/'/g,"\\'");
   const previewColorKey = state.cardPreview[p.sku] || p.colors[0].color;
   const previewEntry = p.colors.find(c => c.color === previewColorKey) || p.colors[0];
   const status = stockStatus(previewEntry.stock);
-  const skuJs = esc(p.sku).replace(/'/g,"\\'");
 
   const swatches = p.colors.map(c => {
     const active = c.color === previewEntry.color;
     const onclickJs = 'previewCardColor(\'' + skuJs + '\',\'' + c.color.replace(/'/g,"\\'") + '\',event)';
+    if(c.color === 'MIX'){
+      return '<span class="swatch swatch-sm mixbadge' + (active?' active':'') + '" onclick="' + onclickJs + '" title="Multiple colors available">' + MIX_ICON_SVG + '</span>';
+    }
     return swatchHtml(c.color, colorToHex(c.color), active, 'swatch-sm', onclickJs, false);
   }).join('');
+
+  const showSwatchRow = p.colors.length > 1 || p.colors[0].color === 'MIX';
 
   return (
     '<div class="pcard" onclick="openDetail(\'' + skuJs + '\')">' +
@@ -662,7 +686,7 @@ function renderCard(p){
         imgTag(previewEntry.imageUrl, 220, '') +
         '<span class="statusdotcorner ' + status + '"></span>' +
       '</div>' +
-      (p.colors.length > 1 ? '<div class="pswatches">' + swatches + '</div>' : '') +
+      (showSwatchRow ? '<div class="pswatches">' + swatches + '</div>' : '') +
       '<p class="pname">' + esc(p.sku) + '</p>' +
       '<p class="pcat">' + esc(titleCase(p.category) || 'Uncategorized') + '</p>' +
       (p.price ? '<p class="pprice">₹' + esc(p.price) + '</p>' : '') +
@@ -689,7 +713,7 @@ function renderHeaderHtml(){
       synced +
       '<div class="searchwrap">' +
         '<input type="text" placeholder="Search by SKU, category, color or size…" value="' + esc(state.search) + '" oninput="setSearch(this.value)">' +
-        (state.search ? '<button class="clearbtn" onclick="clearSearch()">&times;</button>' : '') +
+        '<button id="clearBtn" class="clearbtn" onclick="clearSearch()" style="display:' + (state.search ? '' : 'none') + '">&times;</button>' +
       '</div>' +
       '<div class="chiprow">' + cats.map(c =>
         '<div class="chip ' + (c===state.category?'active':'') + '" onclick="setCategory(\'' + c.replace(/'/g,"\\'") + '\')">' + esc(titleCase(c)) + '</div>'
@@ -708,17 +732,40 @@ function renderGridHtml(){
   return '<div class="grid">' + filtered.map(renderCard).join('') + '</div>';
 }
 
+// The MIX slot has no single real photo — it has a shared gallery instead —
+// so it gets a swipeable carousel here in place of the usual single bigthumb.
+// Swiping only browses photos; the size/stock table below is NOT tied to
+// whichever photo is showing, since stock was never split per-photo (see
+// buildProducts) — it's simply every real row that fed into this slot.
+function renderMixCarouselHtml(colorEntry){
+  const photos = colorEntry.photos.length ? colorEntry.photos : [colorEntry.imageUrl];
+  const slides = photos.map(url =>
+    '<div class="mixslide">' + imgTag(
+      url, 640, '',
+      'onclick="openImageViewer(\'' + esc(toImageSrc(url, 1600)) + '\')"'
+    ) + '</div>'
+  ).join('');
+  const dots = photos.length > 1
+    ? '<div class="mixdots">' + photos.map((_, i) => '<span class="dot' + (i===0?' active':'') + '"></span>').join('') + '</div>'
+    : '';
+  return '<div class="mixcarousel">' + slides + '</div>' + dots;
+}
+
 function renderOverlayHtml(){
   if(!state.selectedCode) return '';
   const p = state.products.find(x => x.sku === state.selectedCode);
   if(!p) return '';
 
   const selectedColorEntry = p.colors.find(c => c.color === state.selectedColor) || p.colors[0];
+  const isMixSelected = selectedColorEntry.color === 'MIX';
 
   const colorSwatches = p.colors.map(c => {
-    const status = stockStatus(c.stock);
     const active = c.color === selectedColorEntry.color;
     const onclickJs = 'selectColor(\'' + c.color.replace(/'/g,"\\'") + '\')';
+    if(c.color === 'MIX'){
+      return '<span class="swatch swatch-lg mixbadge' + (active?' active':'') + '" onclick="' + onclickJs + '" title="Multiple colors available">' + MIX_ICON_SVG + '</span>';
+    }
+    const status = stockStatus(c.stock);
     return swatchHtml(c.color, colorToHex(c.color), active, 'swatch-lg', onclickJs, true, status);
   }).join('');
 
@@ -726,24 +773,25 @@ function renderOverlayHtml(){
     '<div class="sizerow"><span class="sizeval">' + esc(s.size || '—') + '</span>' + stockStamp(s.stock) + '</div>'
   ).join('') : '';
 
-  const bigImgTag = imgTag(
-    selectedColorEntry ? selectedColorEntry.imageUrl : '',
-    640,
-    '',
-    'onclick="openImageViewer(\'' + esc(toImageSrc(selectedColorEntry ? selectedColorEntry.imageUrl : '', 1600)) + '\')"'
-  );
+  const imageAreaHtml = isMixSelected
+    ? renderMixCarouselHtml(selectedColorEntry)
+    : '<div class="bigthumb">' + imgTag(
+        selectedColorEntry ? selectedColorEntry.imageUrl : '',
+        640, '',
+        'onclick="openImageViewer(\'' + esc(toImageSrc(selectedColorEntry ? selectedColorEntry.imageUrl : '', 1600)) + '\')"'
+      ) + '</div>';
 
   return (
     '<div class="overlay" onclick="if(event.target===this) closeDetail()">' +
       '<div class="sheet">' +
         '<div class="closebar"><button onclick="closeDetail()">&times;</button></div>' +
-        '<div class="bigthumb">' + bigImgTag + '</div>' +
+        imageAreaHtml +
         '<h2>' + esc(p.sku) + '</h2>' +
         '<div class="row"><span>Category</span><span>' + esc(titleCase(p.category)||'—') + '</span></div>' +
         (p.price ? '<div class="row"><span>Price</span><span>₹' + esc(p.price) + '</span></div>' : '') +
         '<div class="sectionlabel">Color</div>' +
         '<div class="colorswatches">' + colorSwatches + '</div>' +
-        '<div class="sectionlabel">Sizes &amp; stock &middot; ' + esc(titleCase(selectedColorEntry.color)) + '</div>' +
+        '<div class="sectionlabel">Sizes &amp; stock' + (isMixSelected ? '' : ' &middot; ' + esc(titleCase(selectedColorEntry.color))) + '</div>' +
         '<div class="sizetable">' + sizeRows + '</div>' +
         '<div class="actions">' +
           '<button class="btn" onclick="copyCode(\'' + esc(p.sku).replace(/'/g,"\\'") + '\')">Copy SKU</button>' +
