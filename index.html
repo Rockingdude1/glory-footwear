@@ -118,9 +118,9 @@
     cursor:pointer;flex:0 0 auto;position:relative;
   }
   .swatch-sm{width:15px;height:15px;}
-  .swatch-sm.active{border:2px solid var(--primary);}
+  .swatch-sm.active{border:2px solid #15161A;}
   .swatch-lg{width:32px;height:32px;}
-  .swatch-lg.active{border:2px solid var(--primary);box-shadow:0 0 0 2px #fff inset;}
+  .swatch-lg.active{border:2px solid #15161A;box-shadow:0 0 0 2px #fff inset;}
   .swatch-lg .statusdot{
     position:absolute;bottom:-2px;right:-2px;width:11px;height:11px;border-radius:50%;border:2px solid var(--panel);
   }
@@ -405,25 +405,68 @@ function parseCSV(text){
     const sku = lastSku || skuCell;
     if(!sku) continue;
 
+    const cellCategory = categoryIdx!==undefined ? (cols[categoryIdx]||'').trim() : '';
+    const rowCategory = cellCategory || currentCategory;
+    const rowStock = parseInt(cols[stockIdx], 10) || 0;
+    const rowPrice = priceIdx!==undefined && cols[priceIdx] ? (parseFloat(cols[priceIdx]) || null) : null;
+
+    // "MIX" means no single color was recorded for this row — instead, each
+    // populated Image URL column is actually a distinct color option (e.g.
+    // OWOW-01's one 5x8 row has an Image URL(1) and Image URL(2), one photo
+    // per real color bundled under the "MIX" label). Split those into
+    // separate selectable colors instead of only ever showing the first photo
+    // and silently dropping the rest. The row's stock is shared across them
+    // (split as evenly as possible) since the sheet only gives one combined
+    // number for the whole row — showing the full count under each would
+    // double-count the product's total stock.
+    if(color.trim().toUpperCase() === 'MIX'){
+      const urls = imageIdxs.map(ci => (cols[ci]||'').trim()).filter(Boolean);
+      if(urls.length === 0){
+        items.push({ sku, category: rowCategory, color, size, stock: rowStock, price: rowPrice, imageUrl: '' });
+      } else {
+        const base = Math.floor(rowStock / urls.length);
+        let remainder = rowStock - base * urls.length;
+        urls.forEach((u, i) => {
+          const share = base + (remainder > 0 ? 1 : 0);
+          if(remainder > 0) remainder--;
+          items.push({
+            sku, category: rowCategory,
+            color: extractColorFromFilename(u, 'Color ' + (i + 1)),
+            size, stock: share, price: rowPrice, imageUrl: u
+          });
+        });
+      }
+      continue;
+    }
+
     let imageUrl = '';
     for(const ci of imageIdxs){
       const v = (cols[ci]||'').trim();
       if(v){ imageUrl = v; break; }
     }
 
-    const cellCategory = categoryIdx!==undefined ? (cols[categoryIdx]||'').trim() : '';
-
     items.push({
       sku: sku,
-      category: cellCategory || currentCategory,
+      category: rowCategory,
       color: color,
       size: size,
-      stock: parseInt(cols[stockIdx], 10) || 0,
-      price: priceIdx!==undefined && cols[priceIdx] ? (parseFloat(cols[priceIdx]) || null) : null,
+      stock: rowStock,
+      price: rowPrice,
       imageUrl: imageUrl
     });
   }
   return items;
+}
+
+// Pulls a color name out of a filename shaped like "{SKU}_{Color}_Main.jpg"
+// (the convention used throughout this sheet). Falls back to a generic label
+// if the URL is already a converted Drive link (which has no filename info)
+// or doesn't match the pattern.
+function extractColorFromFilename(url, fallback){
+  if(!url) return fallback;
+  const tail = url.split('/').pop().split('?')[0];
+  const m = tail.match(/_([A-Za-z.]+?)_Main/i);
+  return (m && m[1]) ? m[1] : fallback;
 }
 
 function stockStatus(stock){
