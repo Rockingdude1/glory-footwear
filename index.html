@@ -133,13 +133,22 @@
   .swatch.mixbadge svg{display:block;width:100%;height:100%;}
 
   /* MIX slot: swipeable photo gallery instead of a single bigthumb */
+  .mixcarouselwrap{position:relative;margin-bottom:10px;}
   .mixcarousel{
     display:flex;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
-    border-radius:12px;margin-bottom:10px;
+    border-radius:12px;
   }
   .mixcarousel::-webkit-scrollbar{display:none;}
   .mixslide{flex:0 0 100%;scroll-snap-align:center;}
   .mixslide img{width:100%;height:auto;display:block;border-radius:12px;}
+  .mixarrow{
+    position:absolute;top:50%;transform:translateY(-50%);width:30px;height:30px;
+    border-radius:50%;border:none;background:rgba(0,0,0,0.38);color:#fff;
+    font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;padding:0;
+  }
+  .mixarrow.left{left:8px;}
+  .mixarrow.right{right:8px;}
   .mixdots{display:flex;justify-content:center;gap:6px;margin-bottom:14px;}
   .mixdots .dot{width:6px;height:6px;border-radius:50%;background:var(--line);}
   .mixdots .dot.active{background:var(--primary);}
@@ -745,10 +754,23 @@ function renderMixCarouselHtml(colorEntry){
       'onclick="openImageViewer(\'' + esc(toImageSrc(url, 1600)) + '\')"'
     ) + '</div>'
   ).join('');
+
+  // Arrows are purely an affordance so it's obvious the photo area scrolls —
+  // only shown when there's more than one photo to scroll to.
+  const arrows = photos.length > 1
+    ? '<button class="mixarrow left" onclick="scrollMixCarousel(this,-1)" aria-label="Previous photo">&#8249;</button>' +
+      '<button class="mixarrow right" onclick="scrollMixCarousel(this,1)" aria-label="Next photo">&#8250;</button>'
+    : '';
   const dots = photos.length > 1
     ? '<div class="mixdots">' + photos.map((_, i) => '<span class="dot' + (i===0?' active':'') + '"></span>').join('') + '</div>'
     : '';
-  return '<div class="mixcarousel">' + slides + '</div>' + dots;
+
+  return '<div class="mixcarouselwrap"><div class="mixcarousel">' + slides + '</div>' + arrows + '</div>' + dots;
+}
+
+function scrollMixCarousel(btn, dir){
+  const carousel = btn.parentElement.querySelector('.mixcarousel');
+  if(carousel) carousel.scrollBy({ left: dir * carousel.clientWidth, behavior: 'smooth' });
 }
 
 function renderOverlayHtml(){
