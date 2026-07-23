@@ -259,13 +259,13 @@
   }
   .colorswatches{display:flex;gap:12px;flex-wrap:wrap;}
   .sizetable .sizerow{
-    display:flex;justify-content:space-between;align-items:center;padding:9px 0;
+    display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;padding:9px 0;
     border-bottom:1px solid var(--card-line);font-size:14px;
   }
   .sizetable .sizerow:last-child{border-bottom:none;}
-  .sizetable .sizeleft{display:flex;align-items:baseline;gap:10px;}
-  .sizetable .sizeval{font-family:var(--font-mono);font-weight:700;}
-  .sizetable .sizeprice{font-family:var(--font-mono);font-size:12.5px;color:var(--ink-dim);}
+  .sizetable .sizeval{font-family:var(--font-mono);font-weight:700;text-align:left;}
+  .sizetable .sizeprice{font-family:var(--font-mono);font-size:12.5px;color:var(--ink-dim);text-align:center;}
+  .sizetable .stockcol{text-align:right;}
 </style>
 </head>
 <body>
@@ -952,9 +952,11 @@ function renderOverlayHtml(){
   }).join('');
 
   const sizeRows = selectedColorEntry ? selectedColorEntry.sizes.map(s =>
-    '<div class="sizerow"><span class="sizeleft"><span class="sizeval">' + esc(s.size || '—') + '</span>' +
-      (s.price!=null ? '<span class="sizeprice">₹' + esc(s.price) + '</span>' : '') +
-    '</span>' + stockStamp(s.stock) + '</div>'
+    '<div class="sizerow">' +
+      '<span class="sizeval">' + esc(s.size || '—') + '</span>' +
+      '<span class="sizeprice">' + (s.price!=null ? '₹' + esc(s.price) : '') + '</span>' +
+      '<span class="stockcol">' + stockStamp(s.stock) + '</span>' +
+    '</div>'
   ).join('') : '';
 
   const imageAreaHtml = isMixSelected
