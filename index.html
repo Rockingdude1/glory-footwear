@@ -560,10 +560,12 @@ function buildProducts(items){
       const { photoSet, ...rest } = c;
       return { ...rest, photos: Array.from(photoSet) };
     });
-    const searchParts = [p.sku, p.category].concat(
-      colors.flatMap(c => [c.color].concat(c.sizes.map(s=>s.size)))
-    );
-    return { ...p, colors: colors, searchText: searchParts.join(' ').toLowerCase() };
+    // Search is scoped to SKU + category only — color/size used to be
+    // included too, but that made searches too broad (typing a common size
+    // like "8" matched almost everything).
+    const searchText = [p.sku, p.category].join(' ').toLowerCase();
+    const hasImage = colors.some(c => !!c.imageUrl);
+    return { ...p, colors: colors, searchText: searchText, hasImage: hasImage };
   });
 }
 
@@ -678,7 +680,9 @@ function getFilteredProducts(){
     const q = state.search.trim().toLowerCase();
     list = list.filter(p => p.searchText.includes(q));
   }
-  return list;
+  // Products with no photo at all sink to the bottom rather than showing a
+  // placeholder image mixed in among ones that actually have a real photo.
+  return list.slice().sort((a, b) => (a.hasImage === b.hasImage) ? 0 : (a.hasImage ? -1 : 1));
 }
 
 function getCategories(){
