@@ -60,15 +60,44 @@
   .logotext small{display:block;font-weight:600;letter-spacing:0.14em;color:var(--ink-dim);font-size:9.5px;}
   .logoimg{max-height:42px;display:block;margin:0 auto 10px;}
 
-  .synced{
-    font-size:12px;color:var(--ink-dim);margin-top:2px;font-family:var(--font-mono);
-    display:flex;align-items:center;justify-content:flex-end;
-  }
-  .refreshbtn{
-    background:var(--fill);border:1px solid var(--line);color:var(--primary-dark);font-family:var(--font-body);
-    font-size:11.5px;padding:3px 10px;border-radius:999px;cursor:pointer;
-  }
+  .synced{font-size:12px;color:var(--ink-dim);margin-top:2px;font-family:var(--font-mono);}
   .synced.warn{color:var(--amber);}
+
+  /* Menu button + dropdown */
+  .menubtn{
+    position:absolute;top:14px;right:16px;background:var(--fill);border:1px solid var(--line);
+    width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    color:var(--ink);cursor:pointer;z-index:5;
+  }
+  .navbackdrop{position:fixed;inset:0;z-index:35;}
+  .navmenu{
+    position:absolute;top:56px;right:16px;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;box-shadow:0 8px 24px rgba(20,20,20,0.14);overflow:hidden;z-index:40;min-width:160px;
+  }
+  .navitem{padding:12px 16px;font-family:var(--font-body);font-size:14px;color:var(--ink);cursor:pointer;}
+  .navitem:hover{background:var(--fill);}
+  .navitem.active{color:var(--primary);font-weight:600;}
+
+  /* Contact Us / About Us pages */
+  .pagewrap{padding:16px 16px 40px;}
+  .pagetitle{font-family:var(--font-display);font-size:24px;color:var(--ink);margin:8px 0 4px;}
+  .pagesubtitle{font-family:var(--font-display);font-size:18px;color:var(--ink);margin:26px 0 10px;}
+  .pagequote{font-weight:700;color:var(--primary-dark);margin:0 0 14px;font-size:14px;}
+  .pagetext{font-size:14px;line-height:1.65;color:var(--ink);margin:0 0 14px;}
+  .aboutimg{width:100%;border-radius:14px;display:block;margin-bottom:16px;object-fit:cover;}
+  .brandrow{display:flex;flex-wrap:wrap;gap:20px;align-items:center;}
+  .brandrow img{height:34px;width:auto;object-fit:contain;}
+  .contactform{display:flex;flex-direction:column;gap:12px;margin-bottom:8px;}
+  .contactform label{font-size:13px;color:var(--ink-dim);display:flex;flex-direction:column;gap:6px;}
+  .contactform input,.contactform textarea{
+    font-family:var(--font-body);font-size:14px;padding:10px 12px;border-radius:8px;
+    border:1px solid var(--line);background:var(--fill);color:var(--ink);
+  }
+  .contactform button{align-self:flex-start;margin-top:4px;}
+  .sociallinks{display:flex;gap:16px;margin:14px 0 22px;}
+  .sociallinks a{color:var(--primary-dark);font-weight:600;font-size:13px;text-decoration:none;}
+  .mapembed{border-radius:14px;overflow:hidden;margin-top:8px;}
+  .mapembed iframe{display:block;}
 
   /* Search & filters */
   .searchwrap{margin-top:10px;position:relative;}
@@ -272,7 +301,9 @@ const state = {
   selectedCode: null,
   selectedColor: null,
   cardPreview: {},
-  toast: null
+  toast: null,
+  page: 'home',
+  menuOpen: false
 };
 
 function esc(str){
@@ -590,6 +621,15 @@ function setSearch(val){
 function clearSearch(){ state.search=''; renderHeader(); renderGrid(); }
 function setCategory(c){ state.category = c; renderHeader(); renderGrid(); }
 
+function toggleMenu(){ state.menuOpen = !state.menuOpen; renderHeader(); }
+function navigateTo(page){
+  state.page = page;
+  state.menuOpen = false;
+  renderHeader();
+  renderGrid();
+  window.scrollTo(0, 0);
+}
+
 function openDetail(sku){
   state.selectedCode = sku;
   const product = state.products.find(p => p.sku === sku);
@@ -703,35 +743,62 @@ function renderCard(p){
   );
 }
 
+const NAV_PAGES = [
+  { id: 'home', label: 'Home' },
+  { id: 'contact', label: 'Contact Us' },
+  { id: 'about', label: 'About Us' }
+];
+
 function renderHeaderHtml(){
   const cats = getCategories();
   let synced = '';
   if(state.isDemo){
     synced = '<div class="synced warn">Showing sample data — connect your Google Sheet</div>';
-  } else {
-    synced = '<div class="synced"><button class="refreshbtn" onclick="loadCatalog()">&#8635; Refresh</button></div>';
   }
 
   const logoHtml = BRAND_LOGO_URL
     ? '<img class="logoimg" src="' + esc(BRAND_LOGO_URL) + '" alt="Brand logo">'
     : '<div class="logoplaceholder"><span class="logomark">G</span><span class="logotext">GLORY FOOTWEAR<small>LIVE CATALOG</small></span></div>';
 
+  const menuIcon =
+    '<button class="menubtn" onclick="toggleMenu()" aria-label="Menu">' +
+      '<svg viewBox="0 0 24 24" width="16" height="16"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>' +
+    '</button>';
+
+  const menuDropdown = state.menuOpen ? (
+    '<div class="navbackdrop" onclick="toggleMenu()"></div>' +
+    '<div class="navmenu">' +
+      NAV_PAGES.map(pg =>
+        '<div class="navitem' + (state.page===pg.id?' active':'') + '" onclick="navigateTo(\'' + pg.id + '\')">' + pg.label + '</div>'
+      ).join('') +
+    '</div>'
+  ) : '';
+
+  const searchAndFilters = state.page === 'home' ? (
+    '<div class="searchwrap">' +
+      '<input type="text" placeholder="Search by SKU, category, color or size…" value="' + esc(state.search) + '" oninput="setSearch(this.value)">' +
+      '<button id="clearBtn" class="clearbtn" onclick="clearSearch()" style="display:' + (state.search ? '' : 'none') + '">&times;</button>' +
+    '</div>' +
+    '<div class="chiprow">' + cats.map(c =>
+      '<div class="chip ' + (c===state.category?'active':'') + '" onclick="setCategory(\'' + c.replace(/'/g,"\\'") + '\')">' + esc(titleCase(c)) + '</div>'
+    ).join('') + '</div>'
+  ) : '';
+
   return (
     '<header class="topbar">' +
+      menuIcon +
+      menuDropdown +
       logoHtml +
       synced +
-      '<div class="searchwrap">' +
-        '<input type="text" placeholder="Search by SKU, category, color or size…" value="' + esc(state.search) + '" oninput="setSearch(this.value)">' +
-        '<button id="clearBtn" class="clearbtn" onclick="clearSearch()" style="display:' + (state.search ? '' : 'none') + '">&times;</button>' +
-      '</div>' +
-      '<div class="chiprow">' + cats.map(c =>
-        '<div class="chip ' + (c===state.category?'active':'') + '" onclick="setCategory(\'' + c.replace(/'/g,"\\'") + '\')">' + esc(titleCase(c)) + '</div>'
-      ).join('') + '</div>' +
+      searchAndFilters +
     '</header>'
   );
 }
 
 function renderGridHtml(){
+  if(state.page === 'contact') return renderContactPageHtml();
+  if(state.page === 'about') return renderAboutPageHtml();
+
   const filtered = getFilteredProducts();
   if(state.loading){
     return '<div class="skel">Loading live catalog…</div>';
@@ -739,6 +806,72 @@ function renderGridHtml(){
     return '<div class="emptystate"><div class="big">No matches</div>Try a different name, size, or category.</div>';
   }
   return '<div class="grid">' + filtered.map(renderCard).join('') + '</div>';
+}
+
+// Content mirrors gloryfootwear.com's own Contact Us / About Us pages
+// (address, phone, email, intro copy, brand logos) — restyled to this app's
+// own light/maroon design system rather than cloning their WordPress theme's
+// markup pixel-for-pixel.
+function renderContactPageHtml(){
+  return (
+    '<div class="pagewrap">' +
+      '<h2 class="pagetitle">Get in touch</h2>' +
+      '<form class="contactform" onsubmit="return submitContactForm(event)">' +
+        '<label>Your Name<input type="text" id="cf_name" required></label>' +
+        '<label>Your Email<input type="email" id="cf_email" required></label>' +
+        '<label>Subject<input type="text" id="cf_subject"></label>' +
+        '<label>Your Message<textarea id="cf_message" rows="5"></textarea></label>' +
+        '<button type="submit" class="btn">Send</button>' +
+      '</form>' +
+      '<h3 class="pagesubtitle">Contact info</h3>' +
+      '<div class="row"><span>Postal Address</span><span>K-64, Udyog Nagar,<br>Rohtak Road, Delhi-110041</span></div>' +
+      '<div class="row"><span>Business Phone</span><span><a href="tel:+917042521002">+91 70425 21002</a><br><a href="tel:+919212037475">+91 92120 37475</a></span></div>' +
+      '<div class="row"><span>Say Hello</span><span><a href="mailto:sales@gloryfootwear.com">sales@gloryfootwear.com</a></span></div>' +
+      '<div class="sociallinks">' +
+        '<a href="https://www.facebook.com/TheGloryFootwear/" target="_blank" rel="noopener">Facebook</a>' +
+        '<a href="https://twitter.com/FootwearGlory" target="_blank" rel="noopener">Twitter</a>' +
+        '<a href="https://www.instagram.com/gloryfootwearofficial/" target="_blank" rel="noopener">Instagram</a>' +
+      '</div>' +
+      '<div class="mapembed"><iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3500.2428918096502!2d77.08099631508372!3d28.682379982398245!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x390d04156cfcb2ad%3A0x66a53f8198585e55!2sGlory%20Footwear%20Pvt.%20Ltd.!5e0!3m2!1sen!2sin!4v1591092888570!5m2!1sen!2sin" width="100%" height="280" style="border:0;" loading="lazy" allowfullscreen></iframe></div>' +
+    '</div>'
+  );
+}
+
+// No backend to actually submit to here, so this opens the visitor's own
+// mail client with the message pre-filled — it really sends, unlike a fake
+// "success" message that would silently drop real inquiries.
+function submitContactForm(e){
+  e.preventDefault();
+  const name = document.getElementById('cf_name').value;
+  const email = document.getElementById('cf_email').value;
+  const subject = document.getElementById('cf_subject').value || 'Website inquiry';
+  const message = document.getElementById('cf_message').value;
+  const body = 'Name: ' + name + '\nEmail: ' + email + '\n\n' + message;
+  window.location.href = 'mailto:sales@gloryfootwear.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  return false;
+}
+
+function renderAboutPageHtml(){
+  return (
+    '<div class="pagewrap">' +
+      '<img class="aboutimg" src="about-1.jpg" alt="Glory Footwear">' +
+      '<h2 class="pagetitle">GLORY FOOTWEAR</h2>' +
+      '<p class="pagequote">&ldquo;FOR EVERYONE, EVERYWHERE, IN EVERY STEP OF LIFE&rdquo;</p>' +
+      '<p class="pagetext">Glory Footwear specialises in manufacturing of Hawai Chappals, Beach slippers, Light weight chappals and Fabricated slippers &amp; sandals including a full range of varieties and covering all sizes and styles for men, ladies and children. The Directors of the Company are in the footwear business since 1987. The company manufactures good quality footwear at a competitive price with a complete set of advanced machinery, talented and specialised designers and strict quality management. Each pair is created with ideal combination of man and machine working in tandem, to give perfect blend of style, comfort and quality. We maintain the highest standard of workmanship in whatever we do.</p>' +
+      '<h3 class="pagesubtitle">Introduction</h3>' +
+      '<p class="pagetext">Glory Footwear is a leading manufacturer of hawai chappals, beach slippers, beach sandals, Flipflops, light weight chappals and fabricated slippers and sandals for men, women and kids since 1995. It started off with the manufacture of Hawaii slippers and subsequently diversified into manufacturing of casuals, sandals, slippers, and school shoes. We maintain the highest standard of workmanship in whatever we do. Always eager to walk and extra step to ensure customer satisfaction. Each pair is created with ideal combination of man and machine working in tandem, to give perfect blend of style, comfort and quality.</p>' +
+      '<p class="pagetext"><strong>QUALITY&hellip;..OUR CONSCIENCE</strong></p>' +
+      '<p class="pagetext">Quality is a hallmark at Glory Footwear. From the sourcing of the raw materials, to the delivery of the finished products, all kinds of measures are taken, to ensure that our products maintain their reliability and durability. Every product is inspected and tested for quality. Today, the company has made a distinct mark for their unmatched quality and unquestionable reliability.</p>' +
+      '<img class="aboutimg" src="about-2.jpg" alt="Glory Footwear manufacturing">' +
+      '<h3 class="pagesubtitle">Our Brands</h3>' +
+      '<div class="brandrow">' +
+        '<img src="brand-havai.jpg" alt="Havai">' +
+        '<img src="brand-glotime.png" alt="Glotime">' +
+        '<img src="brand-holiday.png" alt="Holiday">' +
+        '<img src="brand-mezzo.png" alt="Mezzo">' +
+      '</div>' +
+    '</div>'
+  );
 }
 
 // The MIX slot has no single real photo — it has a shared gallery instead —
