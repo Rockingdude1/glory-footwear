@@ -263,7 +263,9 @@
     border-bottom:1px solid var(--card-line);font-size:14px;
   }
   .sizetable .sizerow:last-child{border-bottom:none;}
+  .sizetable .sizeleft{display:flex;align-items:baseline;gap:10px;}
   .sizetable .sizeval{font-family:var(--font-mono);font-weight:700;}
+  .sizetable .sizeprice{font-family:var(--font-mono);font-size:12.5px;color:var(--ink-dim);}
 </style>
 </head>
 <body>
@@ -525,11 +527,15 @@ function buildProducts(items){
 
   items.forEach(it => {
     if(!bySku.has(it.sku)){
-      bySku.set(it.sku, { sku: it.sku, category: it.category, price: it.price, colors: new Map(), totalStock: 0 });
+      bySku.set(it.sku, { sku: it.sku, category: it.category, price: null, colors: new Map(), totalStock: 0 });
     }
     const product = bySku.get(it.sku);
     if(!product.category && it.category) product.category = it.category;
-    if(product.price==null && it.price!=null) product.price = it.price;
+    // MRP varies by size (and sometimes color), so the product-level price
+    // is the lowest across every row — used as a "from ₹X" on the grid card,
+    // never as a single blanket price (see the size/stock table for the
+    // real per-size price).
+    if(it.price!=null && (product.price==null || it.price < product.price)) product.price = it.price;
 
     // Every row whose color contains "mix" was normalized to the literal
     // color 'MIX' in parseCSV, so they all land in the same colorKey here —
@@ -544,7 +550,7 @@ function buildProducts(items){
     if(!colorEntry.imageUrl && it.imageUrl) colorEntry.imageUrl = it.imageUrl;
     (it.imageUrls && it.imageUrls.length ? it.imageUrls : (it.imageUrl ? [it.imageUrl] : []))
       .forEach(u => colorEntry.photoSet.add(u));
-    colorEntry.sizes.push({ size: it.size, stock: it.stock });
+    colorEntry.sizes.push({ size: it.size, stock: it.stock, price: it.price });
     colorEntry.stock += it.stock;
     product.totalStock += it.stock;
   });
@@ -740,9 +746,17 @@ function renderCard(p){
       (showSwatchRow ? '<div class="pswatches">' + swatches + '</div>' : '') +
       '<p class="pname">' + esc(p.sku) + '</p>' +
       '<p class="pcat">' + esc(titleCase(p.category) || 'Uncategorized') + '</p>' +
-      (p.price ? '<p class="pprice">₹' + esc(p.price) + '</p>' : '') +
+      (p.price ? '<p class="pprice">' + (hasPriceRange(p) ? 'From ₹' + esc(p.price) : '₹' + esc(p.price)) + '</p>' : '') +
     '</div>'
   );
+}
+
+// MRP can vary by size (and sometimes color), so the card only ever shows
+// the lowest price — labeled "From ₹X" when other rows actually cost more,
+// or just "₹X" when every size happens to share the same price.
+function hasPriceRange(p){
+  const prices = p.colors.flatMap(c => c.sizes.map(s => s.price)).filter(v => v != null);
+  return prices.length > 0 && Math.max(...prices) !== Math.min(...prices);
 }
 
 const NAV_PAGES = [
@@ -938,7 +952,9 @@ function renderOverlayHtml(){
   }).join('');
 
   const sizeRows = selectedColorEntry ? selectedColorEntry.sizes.map(s =>
-    '<div class="sizerow"><span class="sizeval">' + esc(s.size || '—') + '</span>' + stockStamp(s.stock) + '</div>'
+    '<div class="sizerow"><span class="sizeleft"><span class="sizeval">' + esc(s.size || '—') + '</span>' +
+      (s.price!=null ? '<span class="sizeprice">₹' + esc(s.price) + '</span>' : '') +
+    '</span>' + stockStamp(s.stock) + '</div>'
   ).join('') : '';
 
   const imageAreaHtml = isMixSelected
@@ -956,7 +972,6 @@ function renderOverlayHtml(){
         imageAreaHtml +
         '<h2>' + esc(p.sku) + '</h2>' +
         '<div class="row"><span>Category</span><span>' + esc(titleCase(p.category)||'—') + '</span></div>' +
-        (p.price ? '<div class="row"><span>Price</span><span>₹' + esc(p.price) + '</span></div>' : '') +
         '<div class="sectionlabel">Color</div>' +
         '<div class="colorswatches">' + colorSwatches + '</div>' +
         '<div class="sectionlabel">Sizes &amp; stock' + (isMixSelected ? '' : ' &middot; ' + esc(titleCase(selectedColorEntry.color))) + '</div>' +
