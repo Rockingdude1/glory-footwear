@@ -962,7 +962,11 @@ function renderCard(p){
   const previewEntry = p.colors.find(c => c.color === previewColorKey) || defaultColorEntry;
   const status = previewEntry.status;
 
-  const swatches = p.colors.map(c => {
+  // The currently-previewed color always leads the row, rest keep their
+  // relative order behind it — so which dot is "active" is shown by
+  // position, not just the border.
+  const orderedColors = [previewEntry, ...p.colors.filter(c => c !== previewEntry)];
+  const swatches = orderedColors.map(c => {
     const active = c.color === previewEntry.color;
     const onclickJs = 'previewCardColor(\'' + skuJs + '\',\'' + c.color.replace(/'/g,"\\'") + '\',event)';
     if(c.color === 'MIX'){
