@@ -969,7 +969,7 @@ function renderCard(p){
     '<div class="pcard" onclick="openDetail(\'' + skuJs + '\')">' +
       '<div class="pimg">' +
         imgTag(previewEntry.imageUrl, 220, '') +
-        '<span class="statusdotcorner ' + status + '"></span>' +
+        (state.isInternal ? '<span class="statusdotcorner ' + status + '"></span>' : '') +
       '</div>' +
       (showSwatchRow ? '<div class="pswatches">' + swatches + '</div>' : '') +
       '<p class="pname">' + esc(p.sku) + '</p>' +
