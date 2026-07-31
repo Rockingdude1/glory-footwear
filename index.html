@@ -307,8 +307,10 @@
     border-bottom:1px solid var(--card-line);font-size:14px;
   }
   .sizetable .sizerow:last-child{border-bottom:none;}
+  .sizetable .sizerow.twocol{grid-template-columns:1fr 1fr;}
   .sizetable .sizeval{font-family:var(--font-mono);font-weight:700;text-align:left;}
   .sizetable .sizeprice{font-family:var(--font-mono);font-size:12.5px;color:var(--ink-dim);text-align:center;}
+  .sizetable .sizerow.twocol .sizeprice{text-align:right;}
   .sizetable .stockcol{text-align:right;}
 </style>
 </head>
@@ -1221,14 +1223,14 @@ function renderOverlayHtml(){
     if(c.color === 'MIX'){
       return '<span class="swatch swatch-lg mixbadge' + (active?' active':'') + '" onclick="' + onclickJs + '" title="Multiple colors available">' + MIX_ICON_SVG + '</span>';
     }
-    return swatchHtml(c.color, colorToHex(c.color), active, 'swatch-lg', onclickJs, true, c.status);
+    return swatchHtml(c.color, colorToHex(c.color), active, 'swatch-lg', onclickJs, state.isInternal, c.status);
   }).join('');
 
   const sizeRows = selectedColorEntry ? selectedColorEntry.sizes.map(s =>
-    '<div class="sizerow">' +
+    '<div class="sizerow' + (state.isInternal ? '' : ' twocol') + '">' +
       '<span class="sizeval">' + esc(s.size || '—') + '</span>' +
       '<span class="sizeprice">' + (s.price!=null ? '₹' + esc(s.price) : '') + '</span>' +
-      '<span class="stockcol">' + stockStamp(s) + '</span>' +
+      (state.isInternal ? '<span class="stockcol">' + stockStamp(s) + '</span>' : '') +
     '</div>'
   ).join('') : '';
 
