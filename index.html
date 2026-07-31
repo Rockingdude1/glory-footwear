@@ -154,8 +154,13 @@
   .filtermenu{
     position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--panel);
     border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(20,20,20,0.14);
-    z-index:40;max-height:260px;overflow-y:auto;padding:8px;min-width:180px;
+    z-index:40;max-height:260px;overflow-y:auto;padding:8px;
+    min-width:180px;max-width:calc(100vw - 32px);
   }
+  /* The last dropdown sits near the right edge — its min-width would
+     otherwise push the panel past the screen edge, so it expands leftward
+     (toward the other two buttons) instead of rightward off-screen. */
+  .filterwrap:last-child .filtermenu{left:auto;right:0;}
   .filteroption{display:flex;align-items:center;gap:10px;padding:9px 8px;font-size:14px;color:var(--ink);cursor:pointer;}
   .filteroption input{flex:0 0 auto;}
   .filtermenuactions{display:flex;justify-content:space-between;gap:8px;padding:8px 8px 2px;border-top:1px solid var(--card-line);margin-top:4px;}
