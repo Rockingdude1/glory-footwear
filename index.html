@@ -140,14 +140,29 @@
     position:absolute;right:8px;top:50%;transform:translateY(-50%);
     background:none;border:none;color:var(--ink-dim);font-size:18px;cursor:pointer;padding:4px 8px;
   }
-  .chiprow{display:flex;gap:8px;overflow-x:auto;margin-top:10px;padding-bottom:2px;}
-  .chiprow::-webkit-scrollbar{display:none;}
-  .chip{
-    flex:0 0 auto;font-family:var(--font-body);font-size:13px;
-    padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);
-    color:var(--ink);cursor:pointer;white-space:nowrap;
+  /* Category / Gender / Filter — three independent multi-select dropdowns */
+  .filterbar{display:flex;gap:8px;margin-top:10px;}
+  .filterwrap{position:relative;flex:1;min-width:0;}
+  .filterbtn{
+    width:100%;font-family:var(--font-body);font-size:13px;
+    padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:var(--panel);
+    color:var(--ink);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    display:flex;align-items:center;justify-content:space-between;gap:4px;
   }
-  .chip.active{background:var(--primary);color:#fff;border-color:var(--primary);font-weight:600;}
+  .filterbtn.active{border-color:var(--primary);color:var(--primary);font-weight:600;}
+  .filterchevron{font-size:10px;flex:0 0 auto;}
+  .filtermenu{
+    position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(20,20,20,0.14);
+    z-index:40;max-height:260px;overflow-y:auto;padding:8px;min-width:180px;
+  }
+  .filteroption{display:flex;align-items:center;gap:10px;padding:9px 8px;font-size:14px;color:var(--ink);cursor:pointer;}
+  .filteroption input{flex:0 0 auto;}
+  .filtermenuactions{display:flex;justify-content:space-between;gap:8px;padding:8px 8px 2px;border-top:1px solid var(--card-line);margin-top:4px;}
+  .filtermenuactions button{
+    background:none;border:none;font-family:var(--font-body);font-size:13px;font-weight:600;
+    color:var(--primary-dark);cursor:pointer;padding:6px 4px;
+  }
 
   /* Product grid */
   .grid{padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
@@ -329,7 +344,10 @@ const state = {
   loading: true,
   isDemo: false,
   search: '',
-  category: 'All',
+  // Empty set for a filter group means "no restriction" (show everything) —
+  // the multi-select equivalent of the old single "All" chip.
+  filters: { category: new Set(), gender: new Set(), tag: new Set() },
+  openFilterMenu: null,
   selectedCode: null,
   selectedColor: null,
   cardPreview: {},
@@ -337,6 +355,8 @@ const state = {
   page: 'home',
   menuOpen: false
 };
+
+const TAG_OPTIONS = ['New Arrival', 'Bestseller'];
 
 function esc(str){
   return String(str === undefined || str === null ? '' : str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -458,6 +478,9 @@ function parseCSV(text){
   const categoryIdx = idx.category;
   const priceIdx = idx.mrp !== undefined ? idx.mrp : idx.price;
   const stockIdx = idx.stock;
+  const genderIdx = idx.gender;
+  const bestsellerIdx = idx.bestseller;
+  const newArrivalIdx = idx.newarrival;
   const imageIdxs = headers.map((h,i)=>h.indexOf('imageurl')===0 ? i : -1).filter(i=>i>=0);
 
   if(skuIdx===undefined || stockIdx===undefined){
@@ -467,6 +490,11 @@ function parseCSV(text){
   const items = [];
   let lastSku = null;
   let currentCategory = '';
+  // Gender/tags are filled once on a product's first row, same as SKU itself —
+  // these carry that single value forward onto the blank rows below it.
+  let lastGenderForSku = '';
+  let lastNewArrivalForSku = false;
+  let lastBestsellerForSku = false;
 
   // Any line(s) before the header row are themselves a leading category label.
   for(let i=0;i<headerRowIdx;i++){
@@ -482,7 +510,12 @@ function parseCSV(text){
     const color = colorIdx!==undefined ? (cols[colorIdx]||'').trim() : '';
     const size = sizeIdx!==undefined ? (cols[sizeIdx]||'').trim() : '';
 
-    if(skuCell) lastSku = skuCell;
+    if(skuCell){
+      lastSku = skuCell;
+      lastGenderForSku = '';
+      lastNewArrivalForSku = false;
+      lastBestsellerForSku = false;
+    }
 
     // A row with no color and no size is a category-section header, not a product row.
     if(!color && !size){
@@ -498,6 +531,18 @@ function parseCSV(text){
     const rowStock = parseInt(cols[stockIdx], 10) || 0;
     const rowPrice = priceIdx!==undefined && cols[priceIdx] ? (parseFloat(cols[priceIdx]) || null) : null;
 
+    const rowGenderRaw = genderIdx!==undefined ? (cols[genderIdx]||'').trim() : '';
+    if(rowGenderRaw) lastGenderForSku = rowGenderRaw;
+    const gender = lastGenderForSku || 'Unisex';
+
+    const rowBestsellerRaw = bestsellerIdx!==undefined ? (cols[bestsellerIdx]||'').trim() : '';
+    if(rowBestsellerRaw) lastBestsellerForSku = /^y/i.test(rowBestsellerRaw);
+    const isBestseller = lastBestsellerForSku;
+
+    const rowNewArrivalRaw = newArrivalIdx!==undefined ? (cols[newArrivalIdx]||'').trim() : '';
+    if(rowNewArrivalRaw) lastNewArrivalForSku = /^y/i.test(rowNewArrivalRaw);
+    const isNewArrival = lastNewArrivalForSku;
+
     // Any row whose color mentions "mix" (e.g. "MIX", "MIX P-1") means no
     // single real color was recorded — it's a general assortment, and the
     // populated Image URL columns are just photos of what's in it, not one
@@ -510,7 +555,8 @@ function parseCSV(text){
       items.push({
         sku, category: rowCategory, color: 'MIX', size,
         stock: rowStock, price: rowPrice,
-        imageUrl: urls[0] || '', imageUrls: urls
+        imageUrl: urls[0] || '', imageUrls: urls,
+        gender, isNewArrival, isBestseller
       });
       continue;
     }
@@ -526,6 +572,9 @@ function parseCSV(text){
       category: rowCategory,
       color: color,
       size: size,
+      gender: gender,
+      isNewArrival: isNewArrival,
+      isBestseller: isBestseller,
       stock: rowStock,
       price: rowPrice,
       imageUrl: imageUrl
@@ -555,10 +604,15 @@ function buildProducts(items){
 
   items.forEach(it => {
     if(!bySku.has(it.sku)){
-      bySku.set(it.sku, { sku: it.sku, category: it.category, price: null, colors: new Map(), totalStock: 0 });
+      bySku.set(it.sku, {
+        sku: it.sku, category: it.category, price: null, colors: new Map(), totalStock: 0,
+        gender: it.gender || 'Unisex', isNewArrival: false, isBestseller: false
+      });
     }
     const product = bySku.get(it.sku);
     if(!product.category && it.category) product.category = it.category;
+    if(it.isNewArrival) product.isNewArrival = true;
+    if(it.isBestseller) product.isBestseller = true;
     // MRP varies by size (and sometimes color), so the product-level price
     // is the lowest across every row — used as a "from ₹X" on the grid card,
     // never as a single blanket price (see the size/stock table for the
@@ -657,7 +711,23 @@ function setSearch(val){
   searchDebounceTimer = setTimeout(renderGrid, 150);
 }
 function clearSearch(){ state.search=''; renderHeader(); renderGrid(); }
-function setCategory(c){ state.category = c; renderHeader(); renderGrid(); }
+
+function toggleFilterMenu(group){
+  state.openFilterMenu = state.openFilterMenu === group ? null : group;
+  renderHeader();
+}
+function toggleFilterValue(group, value){
+  const set = state.filters[group];
+  if(set.has(value)) set.delete(value); else set.add(value);
+  renderHeader();
+  renderGrid();
+}
+function clearFilterGroup(group, event){
+  if(event) event.stopPropagation();
+  state.filters[group].clear();
+  renderHeader();
+  renderGrid();
+}
 
 function toggleMenu(){ state.menuOpen = !state.menuOpen; renderHeader(); }
 function navigateTo(page){
@@ -701,8 +771,19 @@ function copyCode(code){
 
 function getFilteredProducts(){
   let list = state.products;
-  if(state.category !== 'All'){
-    list = list.filter(p => (p.category||'Uncategorized').toLowerCase() === state.category.toLowerCase());
+  const f = state.filters;
+
+  if(f.category.size > 0){
+    list = list.filter(p => f.category.has(p.category || 'Uncategorized'));
+  }
+  if(f.gender.size > 0){
+    list = list.filter(p => f.gender.has(p.gender || 'Unisex'));
+  }
+  if(f.tag.size > 0){
+    list = list.filter(p =>
+      (f.tag.has('New Arrival') && p.isNewArrival) ||
+      (f.tag.has('Bestseller') && p.isBestseller)
+    );
   }
   if(state.search.trim()){
     const q = state.search.trim().toLowerCase();
@@ -716,7 +797,13 @@ function getFilteredProducts(){
 function getCategories(){
   const set = new Set();
   state.products.forEach(p => { if(p.category) set.add(p.category); });
-  return ['All'].concat(Array.from(set).sort());
+  return Array.from(set).sort();
+}
+
+function getGenders(){
+  const set = new Set();
+  state.products.forEach(p => set.add(p.gender || 'Unisex'));
+  return Array.from(set).sort();
 }
 
 function swatchHtml(color, hex, isActive, sizeClass, onclickJs, showStatusDot, status){
@@ -805,8 +892,49 @@ const NAV_PAGES = [
   { id: 'contact', label: 'Contact Us' }
 ];
 
+// One of the three multi-select dropdowns (Category / Gender / Filter).
+// Each is its own positioned wrapper so the open panel anchors under its own
+// button rather than one shared position for all three.
+function renderFilterButton(group, label, options){
+  const selected = state.filters[group];
+  const isOpen = state.openFilterMenu === group;
+  const buttonLabel = selected.size > 0 ? label + ' (' + selected.size + ')' : label;
+
+  const optionsHtml = options.map(opt => {
+    const checked = selected.has(opt);
+    const optJs = opt.replace(/'/g,"\\'");
+    return (
+      '<label class="filteroption">' +
+        '<input type="checkbox" ' + (checked?'checked':'') + ' onchange="toggleFilterValue(\'' + group + '\',\'' + optJs + '\')">' +
+        '<span>' + esc(titleCase(opt)) + '</span>' +
+      '</label>'
+    );
+  }).join('');
+
+  const dropdown = isOpen ? (
+    '<div class="navbackdrop" onclick="toggleFilterMenu(\'' + group + '\')"></div>' +
+    '<div class="filtermenu">' +
+      optionsHtml +
+      '<div class="filtermenuactions">' +
+        '<button type="button" onclick="clearFilterGroup(\'' + group + '\', event)">Clear</button>' +
+        '<button type="button" onclick="toggleFilterMenu(\'' + group + '\')">Done</button>' +
+      '</div>' +
+    '</div>'
+  ) : '';
+
+  return (
+    '<div class="filterwrap">' +
+      '<button class="filterbtn' + (selected.size>0?' active':'') + '" onclick="toggleFilterMenu(\'' + group + '\')">' +
+        esc(buttonLabel) + ' <span class="filterchevron">&#9662;</span>' +
+      '</button>' +
+      dropdown +
+    '</div>'
+  );
+}
+
 function renderHeaderHtml(){
   const cats = getCategories();
+  const genders = getGenders();
   let synced = '';
   if(state.isDemo){
     synced = '<div class="synced warn">Showing sample data — connect your Google Sheet</div>';
@@ -840,12 +968,14 @@ function renderHeaderHtml(){
 
   const searchAndFilters = state.page === 'home' ? (
     '<div class="searchwrap">' +
-      '<input type="text" placeholder="Search by SKU, category, color or size…" value="' + esc(state.search) + '" oninput="setSearch(this.value)">' +
+      '<input type="text" placeholder="Search by SKU or category…" value="' + esc(state.search) + '" oninput="setSearch(this.value)">' +
       '<button id="clearBtn" class="clearbtn" onclick="clearSearch()" style="display:' + (state.search ? '' : 'none') + '">&times;</button>' +
     '</div>' +
-    '<div class="chiprow">' + cats.map(c =>
-      '<div class="chip ' + (c===state.category?'active':'') + '" onclick="setCategory(\'' + c.replace(/'/g,"\\'") + '\')">' + esc(titleCase(c)) + '</div>'
-    ).join('') + '</div>'
+    '<div class="filterbar">' +
+      renderFilterButton('category', 'Category', cats) +
+      renderFilterButton('gender', 'Gender', genders) +
+      renderFilterButton('tag', 'Filter', TAG_OPTIONS) +
+    '</div>'
   ) : '';
 
   return (
