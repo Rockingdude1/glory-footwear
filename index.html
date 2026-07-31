@@ -118,6 +118,7 @@
   }
   .sitefooter a{color:var(--ink-dim);text-decoration:none;}
   .footerrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;}
+  .footerbreak{flex-basis:100%;height:0;}
   .footericon{display:inline-flex;color:var(--primary);}
   .footersep{color:var(--line);}
   .footersocial{display:flex;justify-content:center;gap:10px;margin-top:14px;}
@@ -1272,6 +1273,7 @@ function renderFooterHtml(){
         '<a href="tel:+917042521002">+91 70425 21002</a>' +
         '<span class="footersep">|</span>' +
         '<a href="tel:+919212037475">+91 92120 37475</a>' +
+        '<span class="footerbreak"></span>' +
         '<span class="footericon">' + MAIL_ICON_SVG + '</span>' +
         '<a href="mailto:sales@gloryfootwear.com">sales@gloryfootwear.com</a>' +
       '</div>' +
