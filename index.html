@@ -379,6 +379,14 @@ function titleCase(str){
   return String(str||'').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 }
 
+// A color slot is a "mix" slot (photo-gallery badge + carousel instead of a
+// plain color circle) whenever its label mentions "mix" — matches on the
+// full label so distinct sub-categories (MIX P-1, MIX P-2, …) each still get
+// their own slot instead of being lumped together.
+function isMixColor(color){
+  return String(color||'').toLowerCase().includes('mix');
+}
+
 const PLACEHOLDER_SVG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="#EDE6D6"/><path d="M18 64 C18 50 30 46 42 45 L60 43 C70 42 76 47 80 54 L84 60 C86 63 86 67 84 70 L82 73 L18 73 Z" fill="none" stroke="#B9A98A" stroke-width="3" stroke-linejoin="round"/><line x1="30" y1="73" x2="30" y2="78" stroke="#B9A98A" stroke-width="3"/><line x1="74" y1="73" x2="74" y2="78" stroke="#B9A98A" stroke-width="3"/></svg>'
 );
@@ -569,14 +577,15 @@ function parseCSV(text){
     // Any row whose color mentions "mix" (e.g. "MIX", "MIX P-1") means no
     // single real color was recorded — it's a general assortment, and the
     // populated Image URL columns are just photos of what's in it, not one
-    // photo per real color. These all collapse into a single "MIX" color
-    // slot per product (see buildProducts), with the row's full stock kept
-    // intact (no artificial splitting) and every photo folded into a shared
-    // gallery for that slot.
+    // photo per real color. Distinct mix labels (MIX P-1 vs MIX P-2) are kept
+    // as their own color slot, same as real colors — only rows sharing the
+    // exact same label collapse together (see buildProducts) — with the
+    // row's full stock kept intact (no artificial splitting) and every photo
+    // folded into a shared gallery for that slot.
     if(color.toLowerCase().includes('mix')){
       const urls = imageIdxs.map(ci => (cols[ci]||'').trim()).filter(Boolean);
       items.push({
-        sku, category: rowCategory, color: 'MIX', size,
+        sku, category: rowCategory, color: color, size,
         stock: rowStock, price: rowPrice,
         imageUrl: urls[0] || '', imageUrls: urls,
         gender, isNewArrival, isBestseller
@@ -648,11 +657,10 @@ function buildProducts(items){
     // real per-size price).
     if(it.price!=null && (product.price==null || it.price < product.price)) product.price = it.price;
 
-    // Every row whose color contains "mix" was normalized to the literal
-    // color 'MIX' in parseCSV, so they all land in the same colorKey here —
-    // this is what collapses OWOW-01's 3 size-rows (or RINA's stray "MIX"
-    // row alongside its real RED/S.GRN colors) into exactly one MIX slot per
-    // product, instead of one slot per row.
+    // Rows keep their exact color label from the sheet, mix or not — rows
+    // sharing the same label (e.g. RINA's stray "MIX" row, or GT-054's
+    // "MIX P-1" rows) collapse into one slot per distinct label, same as any
+    // other color; "MIX P-1" and "MIX P-2" land in separate slots.
     const colorKey = it.color || 'Standard';
     if(!product.colors.has(colorKey)){
       product.colors.set(colorKey, { color: colorKey, imageUrl: '', photoSet: new Set(), stock: 0, sizes: [] });
@@ -969,13 +977,13 @@ function renderCard(p){
   const swatches = orderedColors.map(c => {
     const active = c.color === previewEntry.color;
     const onclickJs = 'previewCardColor(\'' + skuJs + '\',\'' + c.color.replace(/'/g,"\\'") + '\',event)';
-    if(c.color === 'MIX'){
-      return '<span class="swatch swatch-sm mixbadge' + (active?' active':'') + '" onclick="' + onclickJs + '" title="Multiple colors available">' + MIX_ICON_SVG + '</span>';
+    if(isMixColor(c.color)){
+      return '<span class="swatch swatch-sm mixbadge' + (active?' active':'') + '" onclick="' + onclickJs + '" title="' + esc(titleCase(c.color)) + '">' + MIX_ICON_SVG + '</span>';
     }
     return swatchHtml(c.color, colorToHex(c.color), active, 'swatch-sm', onclickJs, false);
   }).join('');
 
-  const showSwatchRow = p.colors.length > 1 || p.colors[0].color === 'MIX';
+  const showSwatchRow = p.colors.length > 1 || isMixColor(p.colors[0].color);
 
   return (
     '<div class="pcard" onclick="openDetail(\'' + skuJs + '\')">' +
@@ -1226,13 +1234,13 @@ function renderOverlayHtml(){
   if(!p) return '';
 
   const selectedColorEntry = p.colors.find(c => c.color === state.selectedColor) || p.colors[0];
-  const isMixSelected = selectedColorEntry.color === 'MIX';
+  const isMixSelected = isMixColor(selectedColorEntry.color);
 
   const colorSwatches = p.colors.map(c => {
     const active = c.color === selectedColorEntry.color;
     const onclickJs = 'selectColor(\'' + c.color.replace(/'/g,"\\'") + '\')';
-    if(c.color === 'MIX'){
-      return '<span class="swatch swatch-lg mixbadge' + (active?' active':'') + '" onclick="' + onclickJs + '" title="Multiple colors available">' + MIX_ICON_SVG + '</span>';
+    if(isMixColor(c.color)){
+      return '<span class="swatch swatch-lg mixbadge' + (active?' active':'') + '" onclick="' + onclickJs + '" title="' + esc(titleCase(c.color)) + '">' + MIX_ICON_SVG + '</span>';
     }
     return swatchHtml(c.color, colorToHex(c.color), active, 'swatch-lg', onclickJs, state.isInternal, c.status);
   }).join('');
@@ -1262,7 +1270,7 @@ function renderOverlayHtml(){
         '<div class="row"><span>Category</span><span>' + esc(titleCase(p.category)||'—') + '</span></div>' +
         '<div class="sectionlabel">Color</div>' +
         '<div class="colorswatches">' + colorSwatches + '</div>' +
-        '<div class="sectionlabel">Sizes &amp; stock' + (isMixSelected ? '' : ' &middot; ' + esc(titleCase(selectedColorEntry.color))) + '</div>' +
+        '<div class="sectionlabel">Sizes &amp; stock &middot; ' + esc(titleCase(selectedColorEntry.color)) + '</div>' +
         '<div class="sizetable">' + sizeRows + '</div>' +
         '<div class="actions">' +
           '<button class="btn" onclick="copyCode(\'' + esc(p.sku).replace(/'/g,"\\'") + '\')">Copy SKU</button>' +

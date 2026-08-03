@@ -151,7 +151,7 @@ function parseCSV(text){
     if(color.toLowerCase().includes('mix')){
       const urls = imageIdxs.map(ci => (cols[ci]||'').trim()).filter(Boolean);
       items.push({
-        sku, category: rowCategory, color: 'MIX', size,
+        sku, category: rowCategory, color: color, size,
         stock: rowStock, price: rowPrice,
         imageUrl: urls[0] || '', imageUrls: urls,
         gender, isNewArrival, isBestseller
